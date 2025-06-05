@@ -38,21 +38,31 @@ impl CgMode {
 #[derive(Clone)]
 pub struct Criu {
     criu_path: String,
-    sv: [i32; 2],
-    pid: i32,
+    sv: [i32; 2], // socket pair
+
     images_dir_fd: i32,
-    log_level: i32,
-    log_file: Option<String>,
-    external_mounts: Vec<(String, String)>,
-    orphan_pts_master: Option<bool>,
-    root: Option<String>,
+    pid: i32,
+
     leave_running: Option<bool>,
     ext_unix_sk: Option<bool>,
     shell_job: Option<bool>,
     tcp_established: Option<bool>,
     file_locks: Option<bool>,
-    manage_cgroups: Option<bool>,
+    log_level: i32,
+    log_file: Option<String>,
+
+    root: Option<String>,
+    parent_img: Option<String>,
+    track_mem: Option<bool>,
+    auto_dedup: Option<bool>,
+
     work_dir_fd: i32,
+
+    orphan_pts_master: Option<bool>,
+
+    external_mounts: Vec<(String, String)>,
+    manage_cgroups: Option<bool>,
+
     freeze_cgroup: Option<String>,
     cgroups_mode: Option<CgMode>,
     cgroup_props: Option<String>,
@@ -84,6 +94,9 @@ impl Criu {
             freeze_cgroup: None,
             cgroups_mode: None,
             cgroup_props: None,
+            parent_img: None,
+            track_mem: None,
+            auto_dedup: None,
         })
     }
 
@@ -258,6 +271,18 @@ impl Criu {
         self.cgroup_props = Some(props);
     }
 
+    pub fn set_parent_img(&mut self, parent_img: String) {
+        self.parent_img = Some(parent_img);
+    }
+
+    pub fn set_track_mem(&mut self, track_mem: bool) {
+        self.track_mem = Some(track_mem);
+    }
+
+    pub fn set_auto_dedup(&mut self, auto_dedup: bool) {
+        self.auto_dedup = Some(auto_dedup);
+    }
+
     fn fill_criu_opts(&mut self, criu_opts: &mut rpc::Criu_opts) {
         if self.pid != -1 {
             criu_opts.set_pid(self.pid);
@@ -343,6 +368,18 @@ impl Criu {
         if self.cgroup_props.is_some() {
             criu_opts.set_cgroup_props(self.cgroup_props.clone().unwrap());
         }
+
+        if self.parent_img.is_some() {
+            criu_opts.set_parent_img(self.parent_img.clone().unwrap());
+        }
+
+        if self.track_mem.is_some() {
+            criu_opts.set_track_mem(self.track_mem.unwrap());
+        }
+
+        if self.auto_dedup.is_some() {
+            criu_opts.set_auto_dedup(self.auto_dedup.unwrap());
+        }
     }
 
     fn clear(&mut self) {
@@ -363,6 +400,9 @@ impl Criu {
         self.freeze_cgroup = None;
         self.cgroups_mode = None;
         self.cgroup_props = None;
+        self.parent_img = None;
+        self.track_mem = None;
+        self.auto_dedup = None;
     }
 
     pub fn dump(&mut self) -> Result<(), Box<dyn Error>> {
